@@ -50,3 +50,9 @@ spring:
 logging:
   level:
     com.kimngeam.backend: INFO
+
+---
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAutoConfiguration
