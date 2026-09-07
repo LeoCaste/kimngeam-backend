@@ -26,11 +26,13 @@ volumen `pgdata` y partir de una base vacía).
 
 ## Variables de entorno
 
-La app lee la conexión a la base desde variables de entorno (ver
-`src/main/resources/application.yml`), nunca hardcodeadas:
+La app lee configuración sensible desde variables de entorno (ver
+`src/main/resources/application.yml`), nunca hardcodeada:
 
 | Variable                | Default     | Descripción                          |
 |--------------------------|-------------|---------------------------------------|
+| `JWT_SECRET`             | *(sin default, requerida)* | Clave HS256 para firmar JWT, ≥32 caracteres |
+| `JWT_EXPIRATION_MS`      | `86400000`  | Vida del token en ms (24h)            |
 | `DB_HOST`                | `localhost` | Host de Postgres                      |
 | `DB_PORT`                | `5432`      | Puerto de Postgres                    |
 | `DB_NAME`                | `kimngeam`  | Nombre de la base                     |
@@ -39,12 +41,49 @@ La app lee la conexión a la base desde variables de entorno (ver
 | `SPRING_PROFILES_ACTIVE` | `dev`       | Perfil activo (`dev` / `prod`)        |
 | `PORT`                   | `8080`      | Puerto HTTP de la app                 |
 
-Con los defaults del `docker-compose.yml` de arriba, alcanza con exportar
-`DB_PASSWORD`:
+Spring Boot no lee archivos `.env` de forma nativa, así que hay que
+exportarlas al entorno antes de correr la app. El repo trae un
+`.env.example` versionado como plantilla; `.env` nunca se versiona
+(está en `.gitignore`).
+
+### Setup inicial
 
 ```bash
-export DB_PASSWORD=kimngeam
+cp .env.example .env
 ```
+
+Editar `.env` y completar `JWT_SECRET` con una clave generada (nunca usar el
+placeholder del ejemplo):
+
+```bash
+openssl rand -base64 48
+```
+
+Pegar el resultado en `JWT_SECRET=` dentro de `.env`. Las variables de
+Postgres del `.env.example` ya calzan con los defaults de
+`docker-compose.yml` de arriba, así que no hace falta tocarlas para
+desarrollo local.
+
+### Correr desde terminal
+
+Como Spring Boot no carga `.env` solo, hay que exportarlo a la shell antes
+de levantar la app:
+
+```bash
+set -a && source .env && set +a
+./mvnw spring-boot:run
+```
+
+`set -a` hace que todo lo que `source` defina se exporte automáticamente;
+`set +a` lo desactiva después para no seguir exportando el resto de la sesión.
+
+### Correr desde IntelliJ
+
+IntelliJ no carga `.env` automáticamente. Configurar las variables en la
+run configuration: **Run → Edit Configurations… → (tu configuración
+Spring Boot) → Environment variables**, y pegar ahí el contenido de `.env`
+(IntelliJ acepta pegar múltiples `CLAVE=valor` de una vez). Alternativamente,
+instalar el plugin *EnvFile* y apuntarlo directamente al archivo `.env`.
 
 ## Migraciones (Flyway)
 
@@ -61,13 +100,6 @@ Para correrlas sin levantar la app completa:
   -Dflyway.url=jdbc:postgresql://localhost:5432/kimngeam \
   -Dflyway.user=kimngeam \
   -Dflyway.password=kimngeam
-```
-
-## Correr la app
-
-```bash
-export DB_PASSWORD=kimngeam
-./mvnw spring-boot:run
 ```
 
 ## Notas pendientes
