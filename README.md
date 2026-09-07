@@ -107,6 +107,21 @@ Para correrlas sin levantar la app completa:
   -Dflyway.password=kimngeam
 ```
 
+## Seed de desarrollo (perfil `dev`)
+
+Con el perfil `dev` activo (el default), al arrancar la app se crean
+automáticamente dos usuarios si no existen ya, para poder probar los
+endpoints de `/auth` sin pasar por `/auth/registro`:
+
+| Rol        | Email               | Password      |
+|------------|---------------------|---------------|
+| academico  | `tefi@ufro.cl`      | `password123` |
+| admin      | `admin@kimngeam.cl` | `admin1234`   |
+
+Son credenciales de desarrollo, sin datos sensibles reales — no hay problema
+en que estén documentadas acá. Este seed nunca corre bajo el perfil `prod`
+(`DevUsuarioSeeder` está anotado con `@Profile("dev")`).
+
 ## Notas pendientes
 
 - La dimensión de `corpus_chunk.embedding` (`VECTOR(1536)`) es solo un
