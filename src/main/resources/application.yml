@@ -18,6 +18,12 @@ spring:
 server:
   port: ${PORT:8080}
 
+# JWT_SECRET es obligatorio (sin default) y debe tener al menos 32 caracteres
+# (HS256 requiere una clave >= 256 bits). Nunca hardcodear este valor.
+jwt:
+  secret: ${JWT_SECRET}
+  expiration-ms: ${JWT_EXPIRATION_MS:86400000} # 24h — pendiente de confirmar (ver docs/TODO.md, Fase 1)
+
 ---
 spring:
   config:
