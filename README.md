@@ -21,7 +21,7 @@ Esto levanta `pgvector/pgvector:pg16` en `localhost:5432` con:
 - usuario: `kimngeam`
 - password: `kimngeam`
 
-Para detenerlo: `docker compose down` (agregar `-v` si además querés borrar el
+Para detenerlo: `docker compose down` (agregar `-v` si además quieres borrar el
 volumen `pgdata` y partir de una base vacía).
 
 ## Variables de entorno
@@ -40,6 +40,11 @@ La app lee configuración sensible desde variables de entorno (ver
 | `DB_PASSWORD`            | *(sin default, requerida)* | Password de la base    |
 | `SPRING_PROFILES_ACTIVE` | `dev`       | Perfil activo (`dev` / `prod`)        |
 | `PORT`                   | `8080`      | Puerto HTTP de la app                 |
+
+`DB_PASSWORD` no tiene default en `application.yml` a propósito (ningún
+secreto lo tiene, ver `CLAUDE.md`), pero para desarrollo local su valor es
+simplemente `kimngeam`, el mismo que expone `docker-compose.yml` arriba. En
+producción debe venir del entorno real, nunca reutilizar ese valor.
 
 Spring Boot no lee archivos `.env` de forma nativa, así que hay que
 exportarlas al entorno antes de correr la app. El repo trae un
@@ -104,9 +109,10 @@ Para correrlas sin levantar la app completa:
 
 ## Notas pendientes
 
-- La dimensión de `corpus_chunk.embedding` (`VECTOR(1536)`) es un placeholder
-  alineado a los embeddings de OpenAI; se ajustará (con una migración nueva)
-  una vez decidido el proveedor de embeddings.
+- La dimensión de `corpus_chunk.embedding` (`VECTOR(1536)`) es solo un
+  placeholder de referencia (coincide con la dimensión de los embeddings de
+  OpenAI, pero eso no implica que ese proveedor ya esté elegido); se ajustará
+  (con una migración nueva) una vez decidido el proveedor de embeddings.
 - El proveedor de LLM de traducción todavía no está decidido (candidatos:
   OpenRouter, Google AI Studio, Ofox AI). La integración quedará detrás de una
   interfaz propia para poder cambiarlo sin tocar el resto del código.
