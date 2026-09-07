@@ -5,6 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.AuthenticationException;
@@ -32,6 +33,7 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
 			throws IOException, ServletException {
 		response.setStatus(HttpStatus.UNAUTHORIZED.value());
 		response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+		response.setCharacterEncoding(StandardCharsets.UTF_8.name());
 		objectMapper.writeValue(response.getWriter(), ErrorResponse.of("UNAUTHORIZED", "Token inválido o expirado"));
 	}
 }
