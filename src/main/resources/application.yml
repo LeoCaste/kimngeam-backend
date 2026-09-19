@@ -24,7 +24,17 @@ jwt:
   secret: ${JWT_SECRET}
   expiration-ms: ${JWT_EXPIRATION_MS:86400000} # 24h — pendiente de confirmar (ver docs/TODO.md, Fase 1)
 
+# Las fuentes del corpus (~240 MB) viven fuera del repo — ver CLAUDE.md,
+# "Fuentes de datos del corpus". Default vacío (no obligatorio como JWT_SECRET)
+# a propósito: la app debe arrancar igual sin esta variable mientras la
+# ingesta esté desactivada; CorpusIngestionRunner exige que venga seteada
+# recién al momento de ejecutarse.
 kimngeam:
+  corpus:
+    path: ${KIMNGEAM_CORPUS_PATH:}
+    ingestion:
+      enabled: ${KIMNGEAM_CORPUS_INGESTION_ENABLED:false}
+      batch-size: ${KIMNGEAM_CORPUS_INGESTION_BATCH_SIZE:200}
   # Proveedor de embeddings, intercambiable sin tocar código (ver
   # rag/embedding/EmbeddingModelConfig). Default "ollama" para que un clon
   # nuevo del repo levante en desarrollo sin credenciales de OpenRouter.

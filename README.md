@@ -40,6 +40,9 @@ La app lee configuración sensible desde variables de entorno (ver
 | `DB_PASSWORD`            | *(sin default, requerida)* | Password de la base    |
 | `SPRING_PROFILES_ACTIVE` | `dev`       | Perfil activo (`dev` / `prod`)        |
 | `PORT`                   | `8080`      | Puerto HTTP de la app                 |
+| `KIMNGEAM_CORPUS_PATH`   | *(vacío)*   | Ruta absoluta a la carpeta con las fuentes del corpus (ver abajo) |
+| `KIMNGEAM_CORPUS_INGESTION_ENABLED` | `false` | Activa el job de carga del corpus a `corpus_chunk` |
+| `KIMNGEAM_CORPUS_INGESTION_BATCH_SIZE` | `200` | Tamaño de lote al insertar chunks y generar embeddings |
 | `KIMNGEAM_EMBEDDING_PROVIDER` | `ollama` | Proveedor de embeddings activo: `openrouter` u `ollama` (ver abajo) |
 | `KIMNGEAM_EMBEDDING_OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Base URL de OpenRouter (API compatible con OpenAI) |
 | `OPENROUTER_API_KEY`    | *(sin default, requerida si `provider=openrouter`)* | API key de OpenRouter |
@@ -129,6 +132,29 @@ endpoints de `/auth` sin pasar por `/auth/registro`:
 Son credenciales de desarrollo, sin datos sensibles reales — no hay problema
 en que estén documentadas acá. Este seed nunca corre bajo el perfil `prod`
 (`DevUsuarioSeeder` está anotado con `@Profile("dev")`).
+
+## Fuentes del corpus (Fase 2)
+
+Las fuentes del corpus (diccionario mapudungun-español, PDFs OCR,
+transcripciones `.txt`, JSONL preprocesado) pesan ~240 MB y **no van en este
+repo**. `KIMNGEAM_CORPUS_PATH` apunta a la carpeta donde vivan en tu máquina;
+un clon limpio del repo no las trae, así que nunca se hardcodea una ruta
+relativa. Contactar al equipo para conseguir esa carpeta.
+
+El job de ingesta (`rag/ingestion`) lee todos los `*.jsonl` de esa carpeta,
+uno por línea, con el shape:
+
+```json
+{"source_type":"translation_examples","source_ref":"...","contenido":"MAP: ...\nESP: ...","variante":null,"metadata":{},"validado":false}
+```
+
+Está desactivado por defecto (`KIMNGEAM_CORPUS_INGESTION_ENABLED=false`):
+nunca debe correr solo por levantar la app. Al activarlo, embede solo las
+líneas `ESP:` de cada `contenido` (el texto bilingüe completo igual se
+persiste tal cual) y es re-ejecutable sin duplicar — por cada `source_type`
+presente en los JSONL leídos borra los chunks existentes de ese tipo antes de
+recargar, así que cambiar de modelo de embeddings solo implica volver a
+correr el job.
 
 ## Proveedor de embeddings (Fase 2)
 
