@@ -24,6 +24,23 @@ jwt:
   secret: ${JWT_SECRET}
   expiration-ms: ${JWT_EXPIRATION_MS:86400000} # 24h — pendiente de confirmar (ver docs/TODO.md, Fase 1)
 
+kimngeam:
+  # Proveedor de embeddings, intercambiable sin tocar código (ver
+  # rag/embedding/EmbeddingModelConfig). Default "ollama" para que un clon
+  # nuevo del repo levante en desarrollo sin credenciales de OpenRouter.
+  embedding:
+    provider: ${KIMNGEAM_EMBEDDING_PROVIDER:ollama}
+    openrouter:
+      base-url: ${KIMNGEAM_EMBEDDING_OPENROUTER_BASE_URL:https://openrouter.ai/api/v1}
+      # Sin default: nunca un valor literal acá, solo por variable de entorno.
+      api-key: ${OPENROUTER_API_KEY:}
+      model: ${KIMNGEAM_EMBEDDING_OPENROUTER_MODEL:}
+      timeout: ${KIMNGEAM_EMBEDDING_OPENROUTER_TIMEOUT:30s}
+      max-retries: ${KIMNGEAM_EMBEDDING_OPENROUTER_MAX_RETRIES:3}
+    ollama:
+      base-url: ${KIMNGEAM_EMBEDDING_OLLAMA_BASE_URL:http://localhost:11434}
+      model: ${KIMNGEAM_EMBEDDING_OLLAMA_MODEL:}
+
 ---
 spring:
   config:
@@ -52,7 +69,20 @@ logging:
     com.kimngeam.backend: INFO
 
 ---
+# El bean EmbeddingModel se arma a mano en rag/embedding/EmbeddingModelConfig
+# según kimngeam.embedding.provider — estas autoconfiguraciones de Spring AI
+# quedan excluidas para que nunca compitan con esa configuración manual ni
+# instancien un bean (de chat, embedding, imagen, etc.) por su cuenta.
 spring:
   autoconfigure:
     exclude:
       - org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiChatAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiEmbeddingAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiImageAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiModerationAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiAudioTranscriptionAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiAudioSpeechAutoConfiguration
+      - org.springframework.ai.model.ollama.autoconfigure.OllamaChatAutoConfiguration
+      - org.springframework.ai.model.ollama.autoconfigure.OllamaEmbeddingAutoConfiguration
+      - org.springframework.ai.model.ollama.autoconfigure.OllamaApiAutoConfiguration

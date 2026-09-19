@@ -40,6 +40,14 @@ La app lee configuración sensible desde variables de entorno (ver
 | `DB_PASSWORD`            | *(sin default, requerida)* | Password de la base    |
 | `SPRING_PROFILES_ACTIVE` | `dev`       | Perfil activo (`dev` / `prod`)        |
 | `PORT`                   | `8080`      | Puerto HTTP de la app                 |
+| `KIMNGEAM_EMBEDDING_PROVIDER` | `ollama` | Proveedor de embeddings activo: `openrouter` u `ollama` (ver abajo) |
+| `KIMNGEAM_EMBEDDING_OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Base URL de OpenRouter (API compatible con OpenAI) |
+| `OPENROUTER_API_KEY`    | *(sin default, requerida si `provider=openrouter`)* | API key de OpenRouter |
+| `KIMNGEAM_EMBEDDING_OPENROUTER_MODEL` | *(sin default)* | Modelo de embeddings en OpenRouter, ej. `baai/bge-m3` |
+| `KIMNGEAM_EMBEDDING_OPENROUTER_TIMEOUT` | `30s` | Timeout de las llamadas a OpenRouter |
+| `KIMNGEAM_EMBEDDING_OPENROUTER_MAX_RETRIES` | `3` | Reintentos ante fallos de red transitorios |
+| `KIMNGEAM_EMBEDDING_OLLAMA_BASE_URL` | `http://localhost:11434` | Base URL del servidor Ollama local |
+| `KIMNGEAM_EMBEDDING_OLLAMA_MODEL` | *(sin default)* | Modelo de embeddings en Ollama, ej. `bge-m3` |
 
 `DB_PASSWORD` no tiene default en `application.yml` a propósito (ningún
 secreto lo tiene, ver `CLAUDE.md`), pero para desarrollo local su valor es
@@ -122,12 +130,29 @@ Son credenciales de desarrollo, sin datos sensibles reales — no hay problema
 en que estén documentadas acá. Este seed nunca corre bajo el perfil `prod`
 (`DevUsuarioSeeder` está anotado con `@Profile("dev")`).
 
+## Proveedor de embeddings (Fase 2)
+
+Modelo elegido: **bge-m3** (`baai/bge-m3` en OpenRouter), dimensión 1024 (ver
+`V4__corpus_chunk_embedding_dimension.sql`). El sistema soporta dos
+proveedores intercambiables por configuración, ambos detrás de la
+abstracción `EmbeddingModel` de Spring AI (`rag/embedding/EmbeddingModelConfig`):
+
+- **`ollama`** (default): corre local, no consume créditos. Requiere tener
+  Ollama corriendo y el modelo descargado (`ollama pull bge-m3`).
+- **`openrouter`**: API externa de producción, compatible con el protocolo de
+  OpenAI (por eso usa el starter `spring-ai-starter-model-openai` apuntado a
+  la base-url de OpenRouter). Requiere `OPENROUTER_API_KEY`.
+
+Se elige con `KIMNGEAM_EMBEDDING_PROVIDER`; solo se instancia el bean del
+proveedor activo (las autoconfiguraciones propias de Spring AI para OpenAI y
+Ollama están excluidas en `application.yml` para que nunca compitan con esa
+elección). `corpus_chunk.modelo_embedding` guarda un identificador
+"proveedor:modelo" (ej. `ollama:bge-m3` u `openrouter:baai/bge-m3`): el mismo
+modelo servido por proveedores distintos no da necesariamente el mismo
+vector, por eso el proveedor es parte del identificador.
+
 ## Notas pendientes
 
-- La dimensión de `corpus_chunk.embedding` (`VECTOR(1536)`) es solo un
-  placeholder de referencia (coincide con la dimensión de los embeddings de
-  OpenAI, pero eso no implica que ese proveedor ya esté elegido); se ajustará
-  (con una migración nueva) una vez decidido el proveedor de embeddings.
 - El proveedor de LLM de traducción todavía no está decidido (candidatos:
   OpenRouter, Google AI Studio, Ofox AI). La integración quedará detrás de una
   interfaz propia para poder cambiarlo sin tocar el resto del código.
