@@ -35,6 +35,8 @@ kimngeam:
     ingestion:
       enabled: ${KIMNGEAM_CORPUS_INGESTION_ENABLED:false}
       batch-size: ${KIMNGEAM_CORPUS_INGESTION_BATCH_SIZE:200}
+    retrieval:
+      top-n: ${KIMNGEAM_CORPUS_RETRIEVAL_TOP_N:5}
   # Proveedor de embeddings, intercambiable sin tocar código (ver
   # rag/embedding/EmbeddingModelConfig). Default "ollama" para que un clon
   # nuevo del repo levante en desarrollo sin credenciales de OpenRouter.
