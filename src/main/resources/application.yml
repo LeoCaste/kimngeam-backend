@@ -76,6 +76,11 @@ kimngeam:
       model: ${KIMNGEAM_LLM_OLLAMA_MODEL:}
       timeout: ${KIMNGEAM_LLM_OLLAMA_TIMEOUT:90s}
       max-retries: ${KIMNGEAM_LLM_OLLAMA_MAX_RETRIES:1}
+    # Reintentos si la respuesta del LLM no parsea como el JSON esperado (ver
+    # rag/generation/TranslationResponseParser) — nunca se devuelve algo a
+    # medias, tras agotarlos falla explícito.
+    parsing:
+      max-reintentos: ${KIMNGEAM_LLM_PARSING_MAX_REINTENTOS:2}
 
 ---
 spring:

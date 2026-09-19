@@ -61,6 +61,7 @@ La app lee configuración sensible desde variables de entorno (ver
 | `KIMNGEAM_LLM_OLLAMA_MODEL` | *(sin default)* | Modelo de generación en Ollama, ej. `llama3.2` |
 | `KIMNGEAM_LLM_OLLAMA_TIMEOUT` | `90s` | Timeout de las llamadas a Ollama |
 | `KIMNGEAM_LLM_OLLAMA_MAX_RETRIES` | `1` | Reintentos ante fallos de red transitorios |
+| `KIMNGEAM_LLM_PARSING_MAX_REINTENTOS` | `2` | Reintentos si la respuesta del LLM no parsea como el JSON esperado |
 
 `DB_PASSWORD` no tiene default en `application.yml` a propósito (ningún
 secreto lo tiene, ver `CLAUDE.md`), pero para desarrollo local su valor es
@@ -219,8 +220,25 @@ identificador "proveedor:modelo" que generó la respuesta en
 `V5__traduccion_trazabilidad.sql`, que registran de qué segmentos se compone
 cada traducción y qué chunks del corpus respaldaron cada uno, con qué score).
 
+## Prompting y parsing de la generación (Fase 3)
+
+`rag/generation/TranslationPromptBuilder` arma el prompt de cada segmento
+desde la plantilla versionada `prompts/segmento-traduccion.txt` — un recurso,
+no un string en el código, porque va a iterar mucho. No usa el
+`PromptTemplate` de Spring AI: su motor ST4 usa `{}` como delimitador por
+defecto, lo que chocaría con las llaves literales del shape JSON de ejemplo
+que el prompt le muestra al modelo; el reemplazo de placeholders acá es una
+simple sustitución de texto.
+
+`rag/generation/TranslationResponseParser` + `SegmentTranslator` parsean esa
+respuesta: limpian el bloque de markdown que varios modelos agregan
+alrededor del JSON pese a que el prompt pide JSON puro, y reintentan hasta
+`KIMNGEAM_LLM_PARSING_MAX_REINTENTOS` veces si la respuesta no calza con el
+shape esperado. Agotados los intentos, fallan explícito — nunca devuelven una
+traducción a medias.
+
 ## Notas pendientes
 
-- Segmentación del texto de entrada, retrieval aplicado a la traducción,
-  prompting, parsing de la respuesta y el endpoint `POST /traductor/traducir`
-  en sí quedan para el siguiente bloque de la Fase 3 (ver docs/TODO.md).
+- Segmentación del texto de entrada, retrieval aplicado a la traducción y el
+  endpoint `POST /traductor/traducir` en sí quedan para el siguiente bloque
+  de la Fase 3 (ver docs/TODO.md).
