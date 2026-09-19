@@ -51,6 +51,16 @@ La app lee configuración sensible desde variables de entorno (ver
 | `KIMNGEAM_EMBEDDING_OPENROUTER_MAX_RETRIES` | `3` | Reintentos ante fallos de red transitorios |
 | `KIMNGEAM_EMBEDDING_OLLAMA_BASE_URL` | `http://localhost:11434` | Base URL del servidor Ollama local |
 | `KIMNGEAM_EMBEDDING_OLLAMA_MODEL` | *(sin default)* | Modelo de embeddings en Ollama, ej. `bge-m3` |
+| `KIMNGEAM_LLM_PROVIDER` | `openrouter` | Proveedor del LLM de generación activo: `openrouter` u `ollama` (ver abajo) |
+| `KIMNGEAM_LLM_OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Base URL de OpenRouter (API de chat compatible con OpenAI) |
+| `OPENROUTER_API_KEY`    | *(sin default, requerida si `provider=openrouter`)* | API key de OpenRouter (compartida con embeddings) |
+| `KIMNGEAM_LLM_OPENROUTER_MODEL` | `google/gemini-3.8-flash` | Modelo de generación en OpenRouter |
+| `KIMNGEAM_LLM_OPENROUTER_TIMEOUT` | `90s` | Timeout de las llamadas a OpenRouter (la prueba comparativa midió 3-90s según el modelo) |
+| `KIMNGEAM_LLM_OPENROUTER_MAX_RETRIES` | `2` | Reintentos ante fallos de red transitorios |
+| `KIMNGEAM_LLM_OLLAMA_BASE_URL` | `http://localhost:11434` | Base URL del servidor Ollama local |
+| `KIMNGEAM_LLM_OLLAMA_MODEL` | *(sin default)* | Modelo de generación en Ollama, ej. `llama3.2` |
+| `KIMNGEAM_LLM_OLLAMA_TIMEOUT` | `90s` | Timeout de las llamadas a Ollama |
+| `KIMNGEAM_LLM_OLLAMA_MAX_RETRIES` | `1` | Reintentos ante fallos de red transitorios |
 
 `DB_PASSWORD` no tiene default en `application.yml` a propósito (ningún
 secreto lo tiene, ver `CLAUDE.md`), pero para desarrollo local su valor es
@@ -177,8 +187,40 @@ elección). `corpus_chunk.modelo_embedding` guarda un identificador
 modelo servido por proveedores distintos no da necesariamente el mismo
 vector, por eso el proveedor es parte del identificador.
 
+## Proveedor de generación / LLM (Fase 3)
+
+Candidatos evaluados, todos vía OpenRouter (API de chat compatible con
+OpenAI): `google/gemini-3.8-flash` (default, el que más se acercó al material
+validado), `google/gemini-3.1-flash-lite` (el más rápido, ~3s) y
+`openai/gpt-5.4-mini` (declara incertidumbre explícitamente). Las llamadas
+reales midieron latencias de 3 a 90 segundos según el modelo, de ahí el
+timeout alto por defecto.
+
+El sistema soporta dos proveedores intercambiables por configuración, ambos
+detrás de la interfaz propia `TranslationLlmClient`
+(`rag/generation/TranslationLlmClient`) — a diferencia de embeddings, esta
+interfaz es propia (no la de Spring AI) porque futuros proveedores como Google
+AI Studio no son compatibles con el protocolo de OpenAI:
+
+- **`openrouter`** (default): proveedor de producción, vía
+  `spring-ai-starter-model-openai` apuntado a la base-url de OpenRouter.
+  Requiere `OPENROUTER_API_KEY`.
+- **`ollama`**: corre local, SOLO para testeo — nunca para producción.
+  Requiere tener Ollama corriendo y el modelo descargado. A diferencia del
+  proveedor de embeddings, acá Ollama **no** es el default: un modelo de chat
+  local chico produce mapudungun inutilizable, así que no sirve ni como
+  referencia y solo obligaría a descargar un modelo de chat sin necesidad.
+
+Se elige con `KIMNGEAM_LLM_PROVIDER`; solo se instancia el bean del proveedor
+activo (mismo mecanismo que embeddings). Cada traducción persistirá el
+identificador "proveedor:modelo" que generó la respuesta en
+`traduccion.modelo_llm` — trazabilidad completa de cada traducción (ver
+`traduccion_segmento` y `traduccion_fuente` en
+`V5__traduccion_trazabilidad.sql`, que registran de qué segmentos se compone
+cada traducción y qué chunks del corpus respaldaron cada uno, con qué score).
+
 ## Notas pendientes
 
-- El proveedor de LLM de traducción todavía no está decidido (candidatos:
-  OpenRouter, Google AI Studio, Ofox AI). La integración quedará detrás de una
-  interfaz propia para poder cambiarlo sin tocar el resto del código.
+- Segmentación del texto de entrada, retrieval aplicado a la traducción,
+  prompting, parsing de la respuesta y el endpoint `POST /traductor/traducir`
+  en sí quedan para el siguiente bloque de la Fase 3 (ver docs/TODO.md).
