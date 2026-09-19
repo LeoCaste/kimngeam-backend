@@ -14,5 +14,6 @@ public record RetrievedCorpusChunk(
 		String sourceRef,
 		String contenido,
 		String variante,
-		double similitud) {
+		double similitud,
+		boolean validado) {
 }

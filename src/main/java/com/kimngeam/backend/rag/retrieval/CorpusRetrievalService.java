@@ -26,7 +26,7 @@ import org.springframework.stereotype.Service;
 public class CorpusRetrievalService {
 
 	private static final String SQL_SIN_FILTRO = """
-			SELECT id, source_type, source_ref, contenido, variante,
+			SELECT id, source_type, source_ref, contenido, variante, validado,
 			       1 - (embedding <=> ?) AS similitud
 			FROM corpus_chunk
 			WHERE activo = true AND embedding IS NOT NULL
@@ -35,7 +35,7 @@ public class CorpusRetrievalService {
 			""";
 
 	private static final String SQL_CON_FILTRO = """
-			SELECT id, source_type, source_ref, contenido, variante,
+			SELECT id, source_type, source_ref, contenido, variante, validado,
 			       1 - (embedding <=> ?) AS similitud
 			FROM corpus_chunk
 			WHERE activo = true AND embedding IS NOT NULL AND source_type = ?
@@ -88,7 +88,7 @@ public class CorpusRetrievalService {
 	private static RetrievedCorpusChunk mapearFila(ResultSet resultSet, int rowNum) throws SQLException {
 		return new RetrievedCorpusChunk((UUID) resultSet.getObject("id"),
 				SourceType.fromValue(resultSet.getString("source_type")), resultSet.getString("source_ref"),
-				resultSet.getString("contenido"), resultSet.getString("variante"),
-				resultSet.getDouble("similitud"));
+				resultSet.getString("contenido"), resultSet.getString("variante"), resultSet.getDouble("similitud"),
+				resultSet.getBoolean("validado"));
 	}
 }
