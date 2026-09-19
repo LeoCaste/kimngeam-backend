@@ -81,6 +81,24 @@ kimngeam:
     # medias, tras agotarlos falla explícito.
     parsing:
       max-reintentos: ${KIMNGEAM_LLM_PARSING_MAX_REINTENTOS:2}
+  # Orquestación del traductor (ver traductor/TraductorService).
+  traductor:
+    # Bajo este score de similitud coseno un chunk recuperado se descarta
+    # como referencia — contexto irrelevante confunde al modelo. Punto de
+    # partida razonable; conviene recalibrarlo empíricamente contra el
+    # corpus real, como se hizo con el modelo de embeddings en Fase 2.
+    umbral-similitud: ${KIMNGEAM_TRADUCTOR_UMBRAL_SIMILITUD:0.5}
+    segmentacion:
+      # Sobre este largo (caracteres) se rechaza el request (400) — protección
+      # contra abuso, cada traducción cuesta dinero.
+      maximo-entrada: ${KIMNGEAM_TRADUCTOR_MAXIMO_ENTRADA:5000}
+      # Bajo este largo el texto se traduce completo en un solo segmento;
+      # sobre él se parte por oraciones.
+      umbral-segmentacion: ${KIMNGEAM_TRADUCTOR_UMBRAL_SEGMENTACION:200}
+    confianza:
+      # Cuánto más pesa un chunk validado por un académico frente a uno sin
+      # revisar (peso 1) al calcular la confianza de un segmento.
+      peso-chunk-validado: ${KIMNGEAM_TRADUCTOR_PESO_CHUNK_VALIDADO:1.5}
 
 ---
 spring:

@@ -62,6 +62,10 @@ La app lee configuración sensible desde variables de entorno (ver
 | `KIMNGEAM_LLM_OLLAMA_TIMEOUT` | `90s` | Timeout de las llamadas a Ollama |
 | `KIMNGEAM_LLM_OLLAMA_MAX_RETRIES` | `1` | Reintentos ante fallos de red transitorios |
 | `KIMNGEAM_LLM_PARSING_MAX_REINTENTOS` | `2` | Reintentos si la respuesta del LLM no parsea como el JSON esperado |
+| `KIMNGEAM_TRADUCTOR_UMBRAL_SIMILITUD` | `0.5` | Bajo este score de similitud un chunk recuperado se descarta como referencia |
+| `KIMNGEAM_TRADUCTOR_MAXIMO_ENTRADA` | `5000` | Largo máximo (caracteres) del texto a traducir; sobre esto, 400 |
+| `KIMNGEAM_TRADUCTOR_UMBRAL_SEGMENTACION` | `200` | Bajo este largo se traduce completo; sobre él se parte por oraciones |
+| `KIMNGEAM_TRADUCTOR_PESO_CHUNK_VALIDADO` | `1.5` | Cuánto más pesa un chunk validado frente a uno sin revisar en la confianza |
 
 `DB_PASSWORD` no tiene default en `application.yml` a propósito (ningún
 secreto lo tiene, ver `CLAUDE.md`), pero para desarrollo local su valor es
@@ -220,25 +224,54 @@ identificador "proveedor:modelo" que generó la respuesta en
 `V5__traduccion_trazabilidad.sql`, que registran de qué segmentos se compone
 cada traducción y qué chunks del corpus respaldaron cada uno, con qué score).
 
-## Prompting y parsing de la generación (Fase 3)
+## Orquestación del traductor (Fase 3)
 
-`rag/generation/TranslationPromptBuilder` arma el prompt de cada segmento
-desde la plantilla versionada `prompts/segmento-traduccion.txt` — un recurso,
-no un string en el código, porque va a iterar mucho. No usa el
-`PromptTemplate` de Spring AI: su motor ST4 usa `{}` como delimitador por
-defecto, lo que chocaría con las llaves literales del shape JSON de ejemplo
-que el prompt le muestra al modelo; el reemplazo de placeholders acá es una
-simple sustitución de texto.
+`traductor/TraductorService` es el servicio invocable que arma una traducción
+completa (todavía sin el endpoint HTTP, ver "Notas pendientes"):
 
-`rag/generation/TranslationResponseParser` + `SegmentTranslator` parsean esa
-respuesta: limpian el bloque de markdown que varios modelos agregan
-alrededor del JSON pese a que el prompt pide JSON puro, y reintentan hasta
-`KIMNGEAM_LLM_PARSING_MAX_REINTENTOS` veces si la respuesta no calza con el
-shape esperado. Agotados los intentos, fallan explícito — nunca devuelven una
-traducción a medias.
+1. **Segmentación condicional** (`traductor/TextSegmenter`): bajo
+   `KIMNGEAM_TRADUCTOR_UMBRAL_SEGMENTACION` el texto se traduce completo en un
+   solo segmento (`orden = 1`, para que el modelo de datos sea uniforme);
+   sobre ese largo se parte por oraciones. Sobre
+   `KIMNGEAM_TRADUCTOR_MAXIMO_ENTRADA` el request se rechaza (400) — cada
+   traducción cuesta dinero.
+2. **Por cada segmento**: se recupera contexto con `CorpusRetrievalService` y
+   se descartan los chunks bajo `KIMNGEAM_TRADUCTOR_UMBRAL_SIMILITUD` (meter
+   contexto irrelevante confunde al modelo). Si ninguno lo supera, el
+   segmento se marca `con_respaldo = false` y se traduce igual, sin contexto.
+   El segmento anterior (original + traducido) se pasa como contexto en el
+   prompt solo para continuidad ("ella lo hervía" necesita saber a qué se
+   refiere "ella"), nunca para que el modelo lo vuelva a traducir.
+3. **Prompting** (`rag/generation/TranslationPromptBuilder`): arma el prompt
+   desde la plantilla versionada `prompts/segmento-traduccion.txt` — un
+   recurso, no un string en el código, porque va a iterar mucho. No usa el
+   `PromptTemplate` de Spring AI porque su motor ST4 usa `{}` como
+   delimitador por defecto, lo que chocaría con las llaves literales del
+   shape JSON de ejemplo que el prompt le muestra al modelo.
+4. **Parsing con reintentos** (`rag/generation/TranslationResponseParser` +
+   `SegmentTranslator`): limpia el bloque de markdown que varios modelos
+   agregan alrededor del JSON pese a que el prompt pide JSON puro, y
+   reintenta hasta `KIMNGEAM_LLM_PARSING_MAX_REINTENTOS` veces si la
+   respuesta no parsea. Agotados los intentos, falla explícito — nunca
+   devuelve una traducción a medias.
+5. **Confianza derivada del retrieval, nunca pedida al LLM**
+   (`traductor/ConfianzaCalculator`): la de un segmento es el promedio
+   ponderado de los scores de los chunks que lo respaldaron (un chunk
+   validado por un académico pesa `KIMNGEAM_TRADUCTOR_PESO_CHUNK_VALIDADO`
+   veces más que uno sin revisar); `null` si no tuvo respaldo. La global es
+   el promedio de las de sus segmentos, ponderado por el largo de cada uno —
+   un segmento sin respaldo aporta 0 pero su largo igual cuenta, así que
+   arrastra la confianza global hacia abajo en vez de ignorarse.
+6. **Persistencia atómica** (`traductor/TraduccionPersistor`, transaccional y
+   separado del resto a propósito: las llamadas de red de los pasos 2-4 no
+   deben mantener una conexión de base de datos abierta): `traduccion` (con
+   `modelo_llm`), un `traduccion_segmento` por segmento, un `traduccion_fuente`
+   por cada chunk que lo respaldó, y `contexto_cultural` solo cuando
+   `direccion = es-map`.
 
 ## Notas pendientes
 
-- Segmentación del texto de entrada, retrieval aplicado a la traducción y el
-  endpoint `POST /traductor/traducir` en sí quedan para el siguiente bloque
-  de la Fase 3 (ver docs/TODO.md).
+- El endpoint `POST /traductor/traducir` y `GET /historial` en sí quedan para
+  el siguiente bloque de la Fase 3 (ver docs/TODO.md) — hoy
+  `TraductorService.traducir(...)` es un servicio invocable con tests, sin
+  capa HTTP todavía.
