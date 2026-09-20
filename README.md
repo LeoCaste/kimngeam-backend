@@ -296,7 +296,49 @@ anónimas, así que es abusable. Si el servicio llega a correr en más de una
 instancia, este límite necesita moverse a un backend compartido (ej. Redis).
 Al superarlo, `429` con `code: "RATE_LIMITED"`.
 
+## Validaciones (Fase 4)
+
+Esta es la parte del proyecto que de verdad importa (ver CLAUDE.md): un
+académico valida una expresión o una traducción completa, y ese aporte entra
+directo al corpus como material de primera clase — sin eso, el traductor
+nunca mejora.
+
+`POST /validaciones/expresion` y `POST /validaciones/general` — requieren
+auth y rol `academico` (403 si no). Se ligan a la traducción por
+`traduccion_id` y al académico por `usuario_id`, nunca por nombre (ver
+`docs/audit.md`). El campo `tipo` del contrato se deriva de si `expresion` es
+`null`, nunca se persiste aparte.
+
+`validaciones/ValidacionCorpusIndexer` es el corazón de la fase: al guardar
+una validación, genera su embedding (mismo `EmbeddingModel` activo que la
+ingesta) y la inserta en `corpus_chunk` como `source_type = expert_feedback`,
+`validado = true`, `source_ref` apuntando a la validación,
+`validado_por`/`validado_en` del académico y `modelo_embedding` con el
+identificador `"proveedor:modelo"` — una sola validación basta, sin segunda
+aprobación. `CorpusChunkEmbeddingWriter` (antes solo para la ingesta) pasó a
+ser de uso general para esto.
+
+Reversibilidad: un chunk de `expert_feedback` se desactiva
+(`activo = false`), nunca se borra —
+`ValidacionCorpusIndexer.revertir(validacionId)` implementa el mecanismo,
+aunque todavía no hay endpoint que lo exponga.
+
+`ValidacionCorpusIntegrationTest` es la prueba de que el sistema cumple su
+objetivo declarado: crea una validación real sobre un tema específico,
+confirma los campos del `corpus_chunk` resultante, y una consulta de
+retrieval sobre ese mismo tema la recupera — además confirma que la
+confianza pondera más ese chunk validado que uno sin revisar, con datos
+reales. Corre en el build normal (Postgres + Ollama, sin costo).
+
+`V6__seed_variante.sql` siembra la tabla `variante` (`Nguluche`, `Chedungun`,
+`Lafkenche`, `Pewenche`, las que ya usa el frontend prototipo — ver
+`docs/audit.md`): existía desde la V1 como lookup referenciado por FK desde
+`contexto_cultural`, `corpus_chunk` y `validacion`, pero nunca se había
+sembrado porque hasta ahora ningún flujo real insertaba un `variante` no
+nulo. `POST /validaciones/expresion` sí lo hace.
+
 ## Notas pendientes
 
-- Nada pendiente de la Fase 3 — quedan `validaciones/` (Fase 4) y `admin/`
-  (Fase 5), ver `docs/TODO.md`.
+- `admin/` (Fase 5) — incluye el endpoint para revertir una validación sobre
+  `ValidacionCorpusIndexer.revertir(...)`, que ya existe pero no está
+  expuesto. Ver `docs/TODO.md`.
