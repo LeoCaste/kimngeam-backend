@@ -117,6 +117,10 @@ kimngeam:
     invitaciones:
       # Vigencia del token de POST /admin/usuarios/invitar.
       expiracion: ${KIMNGEAM_ADMIN_INVITACIONES_EXPIRACION:7d}
+    dashboard:
+      # Cuántas filas trae "ultimas_validaciones" en GET /admin/dashboard. El
+      # contrato no fija un número.
+      ultimas-validaciones-limite: ${KIMNGEAM_ADMIN_DASHBOARD_ULTIMAS_VALIDACIONES_LIMITE:5}
   # Envío de correo para las invitaciones — mismo mecanismo que embeddings y
   # LLM. Default "log": NO envía nada de verdad, solo deja constancia en el
   # log (ver shared/mail/LoggingMailSender) — así un clon nuevo del repo
