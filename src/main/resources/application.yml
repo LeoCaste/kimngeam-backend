@@ -142,6 +142,13 @@ kimngeam:
   mail:
     provider: ${KIMNGEAM_MAIL_PROVIDER:log}
     remitente: ${KIMNGEAM_MAIL_REMITENTE:no-reply@kimngeam.cl}
+  auth:
+    # Frecuencia del job que purga token_invalidado (ver
+    # shared/security/TokenInvalidadoCleanupJob): borra las filas cuyo
+    # expira_en ya pasó, el propio JWT ya las rechaza por expiración así que
+    # mantenerlas no aporta nada.
+    token-invalidado-cleanup:
+      intervalo: ${KIMNGEAM_TOKEN_INVALIDADO_CLEANUP_INTERVALO:1h}
 
 ---
 spring:

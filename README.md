@@ -78,6 +78,7 @@ La app lee configuración sensible desde variables de entorno (ver
 | `KIMNGEAM_MAIL_PROVIDER` | `log` | Envío de invitaciones: `log` (no envía nada real) o `smtp` |
 | `KIMNGEAM_MAIL_REMITENTE` | `no-reply@kimngeam.cl` | Remitente que ve el destinatario de la invitación |
 | `SPRING_MAIL_HOST` / `SPRING_MAIL_PORT` / `SPRING_MAIL_USERNAME` / `SPRING_MAIL_PASSWORD` | *(vacíos)* | SMTP estándar de Spring Boot, solo si `KIMNGEAM_MAIL_PROVIDER=smtp` |
+| `KIMNGEAM_TOKEN_INVALIDADO_CLEANUP_INTERVALO` | `1h` | Frecuencia del job que purga filas ya expiradas de `token_invalidado` |
 
 `DB_PASSWORD` no tiene default en `application.yml` a propósito (ningún
 secreto lo tiene, ver `CLAUDE.md`), pero para desarrollo local su valor es
@@ -427,6 +428,15 @@ ambiguas y se acordaron explícitamente con el usuario antes de implementar:
 `usuario` es `{nombre, inicial}`, sin `id` — shape distinto del `usuario` de
 `GET /admin/validaciones` (ese sí trae `id`), tal como lo define el contrato
 para cada endpoint.
+
+## Limpieza de `token_invalidado` (Fase 6)
+
+`token_invalidado` crece con cada logout y nunca se purga sola:
+`shared/security/TokenInvalidadoCleanupJob` corre cada
+`KIMNGEAM_TOKEN_INVALIDADO_CLEANUP_INTERVALO` (default 1h) y borra las filas
+cuyo `expira_en` ya pasó — el propio JWT ya las rechaza por expiración antes
+de que `JwtAuthenticationFilter` llegue a consultar la tabla, así que
+mantenerlas en la blacklist no aporta nada.
 
 ## Notas pendientes
 
