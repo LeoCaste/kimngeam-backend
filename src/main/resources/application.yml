@@ -99,6 +99,12 @@ kimngeam:
       # Cuánto más pesa un chunk validado por un académico frente a uno sin
       # revisar (peso 1) al calcular la confianza de un segmento.
       peso-chunk-validado: ${KIMNGEAM_TRADUCTOR_PESO_CHUNK_VALIDADO:1.5}
+    # Límite de solicitudes a POST /traductor/traducir por IP dentro de la
+    # ventana — cada llamada cuesta dinero y el endpoint acepta requests
+    # anónimas, así que es abusable.
+    rate-limit:
+      max-requests: ${KIMNGEAM_TRADUCTOR_RATE_LIMIT_MAX_REQUESTS:10}
+      ventana: ${KIMNGEAM_TRADUCTOR_RATE_LIMIT_VENTANA:1m}
 
 ---
 spring:

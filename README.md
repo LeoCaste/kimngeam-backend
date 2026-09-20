@@ -66,6 +66,8 @@ La app lee configuración sensible desde variables de entorno (ver
 | `KIMNGEAM_TRADUCTOR_MAXIMO_ENTRADA` | `5000` | Largo máximo (caracteres) del texto a traducir; sobre esto, 400 |
 | `KIMNGEAM_TRADUCTOR_UMBRAL_SEGMENTACION` | `200` | Bajo este largo se traduce completo; sobre él se parte por oraciones |
 | `KIMNGEAM_TRADUCTOR_PESO_CHUNK_VALIDADO` | `1.5` | Cuánto más pesa un chunk validado frente a uno sin revisar en la confianza |
+| `KIMNGEAM_TRADUCTOR_RATE_LIMIT_MAX_REQUESTS` | `10` | Solicitudes máximas a `/traductor/traducir` por IP dentro de la ventana |
+| `KIMNGEAM_TRADUCTOR_RATE_LIMIT_VENTANA` | `1m` | Ventana de tiempo del límite anterior |
 
 `DB_PASSWORD` no tiene default en `application.yml` a propósito (ningún
 secreto lo tiene, ver `CLAUDE.md`), pero para desarrollo local su valor es
@@ -286,7 +288,15 @@ baja, y esa señal alimenta la cola de trabajo de los académicos.
 del usuario autenticado (por `usuario_id`, nunca por nombre — ver CLAUDE.md),
 más recientes primero.
 
+`POST /traductor/traducir` tiene rate limiting por IP
+(`traductor/TraductorRateLimiter`, `RateLimitInterceptor`): una ventana fija
+en memoria, simple y suficiente para una sola instancia — cada llamada
+dispara retrieval y una llamada real al LLM, y el endpoint acepta requests
+anónimas, así que es abusable. Si el servicio llega a correr en más de una
+instancia, este límite necesita moverse a un backend compartido (ej. Redis).
+Al superarlo, `429` con `code: "RATE_LIMITED"`.
+
 ## Notas pendientes
 
-- Rate limiting en `/traductor/traducir` queda para el resto de la Fase 3
-  (ver docs/TODO.md).
+- Nada pendiente de la Fase 3 — quedan `validaciones/` (Fase 4) y `admin/`
+  (Fase 5), ver `docs/TODO.md`.
