@@ -227,7 +227,8 @@ cada traducción y qué chunks del corpus respaldaron cada uno, con qué score).
 ## Orquestación del traductor (Fase 3)
 
 `traductor/TraductorService` es el servicio invocable que arma una traducción
-completa (todavía sin el endpoint HTTP, ver "Notas pendientes"):
+completa, expuesto por `POST /traductor/traducir` (ver "Endpoints del
+traductor" más abajo):
 
 1. **Segmentación condicional** (`traductor/TextSegmenter`): bajo
    `KIMNGEAM_TRADUCTOR_UMBRAL_SEGMENTACION` el texto se traduce completo en un
@@ -269,9 +270,19 @@ completa (todavía sin el endpoint HTTP, ver "Notas pendientes"):
    por cada chunk que lo respaldó, y `contexto_cultural` solo cuando
    `direccion = es-map`.
 
+## Endpoints del traductor (Fase 3)
+
+`POST /traductor/traducir` — auth opcional: si viene un `Bearer` válido, la
+traducción se asocia al usuario y entra a su historial; si no viene, se
+traduce igual de forma anónima (el filtro JWT nunca rechaza la request por
+falta de token, solo la deja sin autenticar). Request y response siguen el
+shape de `docs/API_CONTRACTS.md`, con un campo adicional deliberado:
+`advertencias` — un array de strings, no vacío cuando **ningún** segmento
+tuvo respaldo del corpus. Es una decisión de producto: el sistema declara
+explícitamente lo que no sabe en vez de dejarlo pasar con solo una confianza
+baja, y esa señal alimenta la cola de trabajo de los académicos.
+
 ## Notas pendientes
 
-- El endpoint `POST /traductor/traducir` y `GET /historial` en sí quedan para
-  el siguiente bloque de la Fase 3 (ver docs/TODO.md) — hoy
-  `TraductorService.traducir(...)` es un servicio invocable con tests, sin
-  capa HTTP todavía.
+- `GET /historial` y rate limiting en `/traductor/traducir` quedan para el
+  resto de la Fase 3 (ver docs/TODO.md).

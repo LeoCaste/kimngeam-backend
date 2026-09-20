@@ -105,7 +105,8 @@ class TraductorServiceTest {
 		when(confianzaCalculator.calcularGlobal(any())).thenReturn(confianzaGlobal);
 
 		TraduccionResultado resultadoEsperado = new TraduccionResultado("trad_1", "Frase uno. Frase dos.",
-				"Traducido uno Traducido dos", Direccion.ES_MAP, confianzaGlobal, List.of(), OffsetDateTime.now());
+				"Traducido uno Traducido dos", Direccion.ES_MAP, confianzaGlobal, List.of(), OffsetDateTime.now(),
+				false);
 		when(traduccionPersistor.persistir(eq(7L), eq("Frase uno. Frase dos."), eq("Traducido uno Traducido dos"),
 				eq(Direccion.ES_MAP), eq(confianzaGlobal), eq("openrouter:google/gemini-3.8-flash"), any()))
 				.thenReturn(resultadoEsperado);

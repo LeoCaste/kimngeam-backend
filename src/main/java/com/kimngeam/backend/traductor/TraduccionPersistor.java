@@ -69,8 +69,9 @@ public class TraduccionPersistor {
 			}
 		}
 
+		boolean sinRespaldo = segmentos.stream().noneMatch(SegmentoProcesado::conRespaldo);
 		return new TraduccionResultado(traduccion.getId(), textoOrigen, textoTraducido, direccion, confianzaGlobal,
-				contextos, traduccion.getFecha());
+				contextos, traduccion.getFecha(), sinRespaldo);
 	}
 
 	private Usuario referenciaUsuario(Long usuarioId) {
