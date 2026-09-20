@@ -68,6 +68,16 @@ La app lee configuración sensible desde variables de entorno (ver
 | `KIMNGEAM_TRADUCTOR_PESO_CHUNK_VALIDADO` | `1.5` | Cuánto más pesa un chunk validado frente a uno sin revisar en la confianza |
 | `KIMNGEAM_TRADUCTOR_RATE_LIMIT_MAX_REQUESTS` | `10` | Solicitudes máximas a `/traductor/traducir` por IP dentro de la ventana |
 | `KIMNGEAM_TRADUCTOR_RATE_LIMIT_VENTANA` | `1m` | Ventana de tiempo del límite anterior |
+| `KIMNGEAM_TRADUCTOR_CONFIANZA_TECHO_SIMILITUD` | `0.72` | Score máximo de similitud medido empíricamente sobre el corpus (Fase 5) |
+| `KIMNGEAM_TRADUCTOR_CONFIANZA_PESO_MAXIMO` | `0.5` | Peso del score máximo de los chunks frente al promedio al combinar evidencia |
+| `KIMNGEAM_TRADUCTOR_CONFIANZA_CHUNKS_COBERTURA` | `3` | Chunks de respaldo que saturan el factor de cobertura en 1.0 |
+| `KIMNGEAM_ADMIN_UMBRAL_SIN_ACTIVIDAD` | `30d` | Umbral para derivar `estado = "sin-actividad"` en `GET /admin/usuarios` |
+| `KIMNGEAM_ADMIN_VALIDACIONES_RECIENTES_LIMITE` | `10` | Filas de `validaciones_recientes` en `GET /admin/usuarios/:id` |
+| `KIMNGEAM_ADMIN_INVITACIONES_EXPIRACION` | `7d` | Vigencia del token de `POST /admin/usuarios/invitar` |
+| `KIMNGEAM_ADMIN_DASHBOARD_ULTIMAS_VALIDACIONES_LIMITE` | `5` | Filas de `ultimas_validaciones` en `GET /admin/dashboard` |
+| `KIMNGEAM_MAIL_PROVIDER` | `log` | Envío de invitaciones: `log` (no envía nada real) o `smtp` |
+| `KIMNGEAM_MAIL_REMITENTE` | `no-reply@kimngeam.cl` | Remitente que ve el destinatario de la invitación |
+| `SPRING_MAIL_HOST` / `SPRING_MAIL_PORT` / `SPRING_MAIL_USERNAME` / `SPRING_MAIL_PASSWORD` | *(vacíos)* | SMTP estándar de Spring Boot, solo si `KIMNGEAM_MAIL_PROVIDER=smtp` |
 
 `DB_PASSWORD` no tiene default en `application.yml` a propósito (ningún
 secreto lo tiene, ver `CLAUDE.md`), pero para desarrollo local su valor es
@@ -258,13 +268,28 @@ traductor" más abajo):
    respuesta no parsea. Agotados los intentos, falla explícito — nunca
    devuelve una traducción a medias.
 5. **Confianza derivada del retrieval, nunca pedida al LLM**
-   (`traductor/ConfianzaCalculator`): la de un segmento es el promedio
-   ponderado de los scores de los chunks que lo respaldaron (un chunk
-   validado por un académico pesa `KIMNGEAM_TRADUCTOR_PESO_CHUNK_VALIDADO`
-   veces más que uno sin revisar); `null` si no tuvo respaldo. La global es
-   el promedio de las de sus segmentos, ponderado por el largo de cada uno —
-   un segmento sin respaldo aporta 0 pero su largo igual cuenta, así que
-   arrastra la confianza global hacia abajo en vez de ignorarse.
+   (`traductor/ConfianzaCalculator`): la de un segmento combina, de los
+   chunks que lo respaldaron, el score máximo con el promedio ponderado (un
+   chunk validado por un académico pesa `KIMNGEAM_TRADUCTOR_PESO_CHUNK_VALIDADO`
+   veces más que uno sin revisar — `KIMNGEAM_TRADUCTOR_CONFIANZA_PESO_MAXIMO`
+   decide cuánto pesa el máximo frente al promedio); `null` si no tuvo
+   respaldo. Ese score combinado se reescala contra
+   `[KIMNGEAM_TRADUCTOR_UMBRAL_SIMILITUD, KIMNGEAM_TRADUCTOR_CONFIANZA_TECHO_SIMILITUD]`
+   en vez de `[0, 1]`, y se multiplica por un factor de cobertura que satura
+   en 1.0 al llegar a `KIMNGEAM_TRADUCTOR_CONFIANZA_CHUNKS_COBERTURA` chunks de
+   respaldo. **Calibración empírica (Fase 5, item 8):** el score crudo de
+   bge-m3 queda comprimido justo por encima del umbral — dos traducciones con
+   respaldo muy distinto (5 chunks centrales del corpus vs. 2 tangenciales)
+   daban confianzas casi indistinguibles (0.56 vs 0.51). Se midió el techo
+   real sobre las 10 consultas de referencia de
+   `CorpusRetrievalServiceIntegrationTest` (máximo observado: 0.7154) y se
+   ajustó la fórmula con ese techo, el blend máximo/promedio y el factor de
+   cobertura; con eso, los mismos dos casos dan 0.34 vs 0.05. Recalibrar
+   `KIMNGEAM_TRADUCTOR_CONFIANZA_TECHO_SIMILITUD` si el corpus cambia
+   sustancialmente. La global es el promedio de las de sus segmentos,
+   ponderado por el largo de cada uno — un segmento sin respaldo aporta 0
+   pero su largo igual cuenta, así que arrastra la confianza global hacia
+   abajo en vez de ignorarse.
 6. **Persistencia atómica** (`traductor/TraduccionPersistor`, transaccional y
    separado del resto a propósito: las llamadas de red de los pasos 2-4 no
    deben mantener una conexión de base de datos abierta): `traduccion` (con
@@ -321,7 +346,7 @@ ser de uso general para esto.
 Reversibilidad: un chunk de `expert_feedback` se desactiva
 (`activo = false`), nunca se borra —
 `ValidacionCorpusIndexer.revertir(validacionId)` implementa el mecanismo,
-aunque todavía no hay endpoint que lo exponga.
+expuesto por `POST /admin/validaciones/:id/revertir` (Fase 5, ver abajo).
 
 `ValidacionCorpusIntegrationTest` es la prueba de que el sistema cumple su
 objetivo declarado: crea una validación real sobre un tema específico,
@@ -337,8 +362,72 @@ reales. Corre en el build normal (Postgres + Ollama, sin costo).
 sembrado porque hasta ahora ningún flujo real insertaba un `variante` no
 nulo. `POST /validaciones/expresion` sí lo hace.
 
+## Panel de administración (Fase 5)
+
+Seis endpoints, todos bajo `/admin/**` con rol `admin` reforzado
+server-side (`SecurityConfig`, desde Fase 1) — el frontend nunca es la
+frontera de autorización (ver CLAUDE.md).
+
+`GET /admin/usuarios` y `GET /admin/usuarios/:id` — listado y detalle vía
+JDBC directo (`admin.usuarios.UsuarioAdminService`), mismo criterio que
+`rag.retrieval.CorpusRetrievalService`: son agregados de solo lectura que no
+ganan nada pasando por JPA. `estado` se deriva en cada consulta
+(`EstadoUsuarioCalculator`), nunca se persiste: `"inactivo"` si el usuario
+está marcado así, `"sin-actividad"` si está activo pero `ultimo_acceso` es
+nulo o anterior a `KIMNGEAM_ADMIN_UMBRAL_SIN_ACTIVIDAD`, `"activo"` en otro
+caso. El detalle trae las últimas `KIMNGEAM_ADMIN_VALIDACIONES_RECIENTES_LIMITE`
+validaciones del usuario, unidas por `usuario_id` (nunca por nombre, ver
+`docs/audit.md`).
+
+`POST /admin/usuarios/invitar` — crea la fila en `invitacion` (token +
+expiración `KIMNGEAM_ADMIN_INVITACIONES_EXPIRACION`) y despacha el correo
+detrás de `shared/mail/MailSender`, con el mismo mecanismo de proveedor
+intercambiable que embeddings y LLM (`KIMNGEAM_MAIL_PROVIDER`):
+`LoggingMailSender` (default) **no envía nada real**, solo deja constancia
+en el log — así un clon nuevo del repo prueba el flujo sin credenciales;
+`SmtpMailSender` usa `spring-boot-starter-mail` y las propiedades estándar
+`spring.mail.*` (`SPRING_MAIL_HOST`/`PORT`/`USERNAME`/`PASSWORD`) —
+deliberadamente SMTP genérico, no la API de un proveedor específico, porque
+lo habla tanto el correo institucional de la UFRO como los servicios
+transaccionales.
+
+`PATCH /admin/usuarios/:id/estado` — solo acepta `"activo"` / `"inactivo"`
+(400 si se intenta asignar `"sin-actividad"`, que es derivado).
+
+`GET /admin/validaciones` — filtros combinables `tipo`, `usuario_id`,
+`busqueda`, siempre parametrizados con `?` (nunca concatenando el valor del
+usuario en el SQL). `tipo` se deriva de si `expresion` es `null`
+(`admin.validaciones.TipoValidacion`, compartido con `admin.usuarios` y
+`admin.dashboard`).
+
+`POST /admin/validaciones/:id/revertir` — no es parte de los 14 endpoints
+originales del contrato: expone `ValidacionCorpusIndexer.revertir(...)`
+(existía desde Fase 4 sin forma de invocarse).
+
+`GET /admin/dashboard` — agregados sin tabla propia
+(`admin.dashboard.DashboardService`). Dos métricas del contrato eran
+ambiguas y se acordaron explícitamente con el usuario antes de implementar:
+
+- **`expresiones`** (`total`, `con_contexto`, `sin_contexto`, `sin_validar`):
+  cuatro conteos **independientes**, no una partición de `total`. `total`,
+  `con_contexto` y `sin_contexto` se calculan sobre traducciones `es-map`
+  (único sentido donde existe contexto cultural, ver CLAUDE.md); `sin_validar`
+  se calcula sobre traducciones de **ambas** direcciones, porque una
+  traducción `map-es` también puede validarse.
+- **`variantes[].porcentaje`**: participación de esa variante sobre el total
+  de validaciones (`cantidad / total_validaciones * 100`), **no** cobertura
+  real del corpus. Hoy no es posible calcular cobertura real porque
+  `corpus_chunk.variante` quedó `null` para los 321 chunks de transcripciones
+  orales — los archivos fuente no traen marca dialectal (ver ingesta, Fase 2).
+  Queda como decisión abierta en `docs/TODO.md` si en algún momento se anota
+  esa variante retroactivamente.
+
+`ultimas_validaciones` trae las últimas
+`KIMNGEAM_ADMIN_DASHBOARD_ULTIMAS_VALIDACIONES_LIMITE` validaciones; su
+`usuario` es `{nombre, inicial}`, sin `id` — shape distinto del `usuario` de
+`GET /admin/validaciones` (ese sí trae `id`), tal como lo define el contrato
+para cada endpoint.
+
 ## Notas pendientes
 
-- `admin/` (Fase 5) — incluye el endpoint para revertir una validación sobre
-  `ValidacionCorpusIndexer.revertir(...)`, que ya existe pero no está
-  expuesto. Ver `docs/TODO.md`.
+- Fase 6 (hardening / cierre) — ver `docs/TODO.md`.
