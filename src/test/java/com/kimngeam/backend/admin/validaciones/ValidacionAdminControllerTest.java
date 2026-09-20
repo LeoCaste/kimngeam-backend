@@ -54,7 +54,15 @@ class ValidacionAdminControllerTest {
 	@Test
 	void academicoRecibe403() throws Exception {
 		mockMvc.perform(get("/admin/validaciones").header(HttpHeaders.AUTHORIZATION, tokenPara(EMAIL_ACADEMICO)))
-				.andExpect(status().isForbidden());
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.code").value("FORBIDDEN"));
+	}
+
+	@Test
+	void sinTokenRecibe401() throws Exception {
+		mockMvc.perform(get("/admin/validaciones"))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
 	}
 
 	@Test
@@ -102,6 +110,23 @@ class ValidacionAdminControllerTest {
 		mockMvc.perform(post("/admin/validaciones/val_no-existe/revertir").header(HttpHeaders.AUTHORIZATION,
 				tokenPara(EMAIL_ADMIN)))
 				.andExpect(status().isNotFound());
+	}
+
+	@Test
+	void academicoRecibe403AlRevertir() throws Exception {
+		ValidacionResponse creada = crearValidacionDeExpresion();
+
+		mockMvc.perform(post("/admin/validaciones/" + creada.id() + "/revertir").header(HttpHeaders.AUTHORIZATION,
+				tokenPara(EMAIL_ACADEMICO)))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.code").value("FORBIDDEN"));
+	}
+
+	@Test
+	void sinTokenRecibe401AlRevertir() throws Exception {
+		mockMvc.perform(post("/admin/validaciones/val_no-existe/revertir"))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
 	}
 
 	private ValidacionResponse crearValidacionDeExpresion() {

@@ -53,7 +53,15 @@ class DashboardControllerTest {
 	@Test
 	void academicoRecibe403() throws Exception {
 		mockMvc.perform(get("/admin/dashboard").header(HttpHeaders.AUTHORIZATION, tokenPara(EMAIL_ACADEMICO)))
-				.andExpect(status().isForbidden());
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.code").value("FORBIDDEN"));
+	}
+
+	@Test
+	void sinTokenRecibe401() throws Exception {
+		mockMvc.perform(get("/admin/dashboard"))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
 	}
 
 	@Test

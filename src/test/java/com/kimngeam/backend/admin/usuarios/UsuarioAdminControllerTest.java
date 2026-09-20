@@ -83,6 +83,25 @@ class UsuarioAdminControllerTest {
 	}
 
 	@Test
+	void academicoRecibe403AlVerDetalle() throws Exception {
+		Long academicoId = usuarioRepository.findByEmail(EMAIL_ACADEMICO).orElseThrow().getId();
+
+		mockMvc.perform(get("/admin/usuarios/" + academicoId).header(HttpHeaders.AUTHORIZATION,
+				tokenPara(EMAIL_ACADEMICO)))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.code").value("FORBIDDEN"));
+	}
+
+	@Test
+	void sinTokenRecibe401AlVerDetalle() throws Exception {
+		Long academicoId = usuarioRepository.findByEmail(EMAIL_ACADEMICO).orElseThrow().getId();
+
+		mockMvc.perform(get("/admin/usuarios/" + academicoId))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+	}
+
+	@Test
 	void adminInvitaUnAcademicoNuevo() throws Exception {
 		String body = """
 				{"nombre": "Stephanie Nueva", "email": "stephanie.nueva.test@ufro.cl"}
@@ -122,6 +141,30 @@ class UsuarioAdminControllerTest {
 	}
 
 	@Test
+	void academicoRecibe403AlInvitar() throws Exception {
+		String body = """
+				{"nombre": "Alguien", "email": "alguien.test@ufro.cl"}
+				""";
+
+		mockMvc.perform(post("/admin/usuarios/invitar").contentType(MediaType.APPLICATION_JSON)
+				.header(HttpHeaders.AUTHORIZATION, tokenPara(EMAIL_ACADEMICO))
+				.content(body))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.code").value("FORBIDDEN"));
+	}
+
+	@Test
+	void sinTokenRecibe401AlInvitar() throws Exception {
+		String body = """
+				{"nombre": "Alguien", "email": "alguien.test@ufro.cl"}
+				""";
+
+		mockMvc.perform(post("/admin/usuarios/invitar").contentType(MediaType.APPLICATION_JSON).content(body))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+	}
+
+	@Test
 	void adminCambiaEstadoDeUnUsuario() throws Exception {
 		Long academicoId = usuarioRepository.findByEmail(EMAIL_ACADEMICO).orElseThrow().getId();
 
@@ -141,6 +184,27 @@ class UsuarioAdminControllerTest {
 				.content("{\"estado\": \"sin-actividad\"}"))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+	}
+
+	@Test
+	void academicoRecibe403AlCambiarEstado() throws Exception {
+		Long academicoId = usuarioRepository.findByEmail(EMAIL_ACADEMICO).orElseThrow().getId();
+
+		mockMvc.perform(patch("/admin/usuarios/" + academicoId + "/estado").contentType(MediaType.APPLICATION_JSON)
+				.header(HttpHeaders.AUTHORIZATION, tokenPara(EMAIL_ACADEMICO))
+				.content("{\"estado\": \"inactivo\"}"))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.code").value("FORBIDDEN"));
+	}
+
+	@Test
+	void sinTokenRecibe401AlCambiarEstado() throws Exception {
+		Long academicoId = usuarioRepository.findByEmail(EMAIL_ACADEMICO).orElseThrow().getId();
+
+		mockMvc.perform(patch("/admin/usuarios/" + academicoId + "/estado").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"estado\": \"inactivo\"}"))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
 	}
 
 	private String tokenPara(String email) {
