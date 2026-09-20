@@ -12,8 +12,10 @@ import org.junit.jupiter.api.Test;
 
 class ConfianzaCalculatorTest {
 
+	// techo=0.72, umbral=0.5 (default de TraductorProperties), peso-maximo=0.5,
+	// chunks-para-cobertura-completa=3 — ver ConfianzaProperties para el porqué.
 	private final ConfianzaCalculator confianzaCalculator = new ConfianzaCalculator(
-			new ConfianzaProperties(new BigDecimal("1.5")));
+			new ConfianzaProperties(new BigDecimal("1.5"), 0.72, 0.5, 3), new TraductorProperties(0.5));
 
 	@Test
 	void sinChunksNoHayConfianza() {
@@ -23,18 +25,35 @@ class ConfianzaCalculatorTest {
 	}
 
 	@Test
-	void unSoloChunkSinValidarUsaSuPropioScore() {
+	void unSoloChunkFuerteSinCoberturaQuedaSaturadoPorCantidadDeChunks() {
+		// combinado = max = promedio = 0.80; reescalado = (0.80-0.5)/(0.72-0.5) =
+		// 1.36 -> clamp 1.0; cobertura = min(1, 1/3) = 0.3333; 1.0*0.3333 = 0.33.
+		// Un solo chunk, por fuerte que sea, no basta para "cobertura completa" —
+		// hacen falta 3 chunks concordantes (ver ConfianzaProperties).
 		BigDecimal confianza = confianzaCalculator.calcularSegmento(List.of(chunk(0.80, false)));
 
-		assertThat(confianza).isEqualByComparingTo("0.80");
+		assertThat(confianza).isEqualByComparingTo("0.33");
 	}
 
 	@Test
 	void unChunkValidadoPesaMasQueUnoSinValidar() {
-		// (0.60*1 + 0.90*1.5) / (1 + 1.5) = 1.95 / 2.5 = 0.78
+		// promedioPonderado = (0.60*1 + 0.90*1.5) / (1 + 1.5) = 0.78; max = 0.90
+		// combinado = 0.5*0.90 + 0.5*0.78 = 0.84
+		// reescalado = (0.84-0.5)/(0.72-0.5) = 1.545 -> clamp 1.0
+		// cobertura = min(1, 2/3) = 0.6667; 1.0*0.6667 = 0.67
 		BigDecimal confianza = confianzaCalculator.calcularSegmento(List.of(chunk(0.60, false), chunk(0.90, true)));
 
-		assertThat(confianza).isEqualByComparingTo("0.78");
+		assertThat(confianza).isEqualByComparingTo("0.67");
+	}
+
+	@Test
+	void tresChunksConScoreCercaDelUmbralDanConfianzaBaja() {
+		// promedio = max = 0.51 (los tres iguales); combinado = 0.51
+		// reescalado = (0.51-0.5)/(0.72-0.5) = 0.0455; cobertura = min(1, 3/3) = 1.0
+		BigDecimal confianza = confianzaCalculator
+				.calcularSegmento(List.of(chunk(0.51, false), chunk(0.51, false), chunk(0.51, false)));
+
+		assertThat(confianza).isEqualByComparingTo("0.05");
 	}
 
 	@Test

@@ -15,35 +15,76 @@ public class ConfianzaCalculator {
 
 	private static final BigDecimal PESO_BASE = BigDecimal.ONE;
 	private static final int ESCALA = 2;
+	private static final int ESCALA_INTERNA = 10;
 
 	private final ConfianzaProperties properties;
+	private final TraductorProperties traductorProperties;
 
-	public ConfianzaCalculator(ConfianzaProperties properties) {
+	public ConfianzaCalculator(ConfianzaProperties properties, TraductorProperties traductorProperties) {
 		this.properties = properties;
+		this.traductorProperties = traductorProperties;
 	}
 
 	/**
-	 * Confianza de un segmento: promedio ponderado de la similitud de los
-	 * chunks que lo respaldaron (ya filtrados por
-	 * {@code kimngeam.traductor.umbral-similitud}). Un chunk validado por un
-	 * académico ({@code corpus_chunk.validado = true}) pesa
-	 * {@code kimngeam.traductor.confianza.peso-chunk-validado} veces más que
-	 * uno sin revisar (peso 1) — una fuente curada es más confiable que una
-	 * transcripción cruda. {@code null} si no hay chunks que la respalden: no
-	 * hay base para derivar un número, no es lo mismo que "confianza cero".
+	 * Confianza de un segmento, sobre los chunks que lo respaldaron (ya
+	 * filtrados por {@code kimngeam.traductor.umbral-similitud}), en tres
+	 * pasos — ver {@link ConfianzaProperties} para el porqué de cada uno:
+	 * <ol>
+	 * <li>Combina el score máximo con el promedio ponderado (un chunk
+	 * validado por un académico pesa {@code peso-chunk-validado} veces más
+	 * que uno sin revisar) — el promedio solo diluye un match fuerte entre
+	 * varios mediocres, así que {@code peso-maximo} decide cuánto pesa ese
+	 * pico frente al conjunto.</li>
+	 * <li>Reescala ese score combinado contra el rango real
+	 * [{@code umbral-similitud}, {@code techo-similitud}] en vez de
+	 * [0, 1].</li>
+	 * <li>Aplica un factor de cobertura que satura en 1.0 al llegar a
+	 * {@code chunks-para-cobertura-completa} chunks de respaldo — varias
+	 * fuentes concordantes son mejor evidencia que una sola, aunque su score
+	 * individual sea parecido.</li>
+	 * </ol>
+	 * {@code null} si no hay chunks que la respalden: no hay base para
+	 * derivar un número, no es lo mismo que "confianza cero".
 	 */
 	public BigDecimal calcularSegmento(List<RetrievedCorpusChunk> chunksUsados) {
 		if (chunksUsados.isEmpty()) {
 			return null;
 		}
+
 		BigDecimal sumaPonderada = BigDecimal.ZERO;
 		BigDecimal sumaPesos = BigDecimal.ZERO;
+		double maximo = 0;
 		for (RetrievedCorpusChunk chunk : chunksUsados) {
 			BigDecimal peso = chunk.validado() ? properties.pesoChunkValidado() : PESO_BASE;
 			sumaPonderada = sumaPonderada.add(peso.multiply(BigDecimal.valueOf(chunk.similitud())));
 			sumaPesos = sumaPesos.add(peso);
+			maximo = Math.max(maximo, chunk.similitud());
 		}
-		return sumaPonderada.divide(sumaPesos, ESCALA, RoundingMode.HALF_UP);
+		BigDecimal promedioPonderado = sumaPonderada.divide(sumaPesos, ESCALA_INTERNA, RoundingMode.HALF_UP);
+
+		BigDecimal pesoMaximo = BigDecimal.valueOf(properties.pesoMaximo());
+		BigDecimal combinado = BigDecimal.valueOf(maximo).multiply(pesoMaximo)
+				.add(promedioPonderado.multiply(BigDecimal.ONE.subtract(pesoMaximo)));
+
+		BigDecimal umbral = BigDecimal.valueOf(traductorProperties.umbralSimilitud());
+		BigDecimal techo = BigDecimal.valueOf(properties.techoSimilitud());
+		BigDecimal reescalado = clampUnitario(
+				combinado.subtract(umbral).divide(techo.subtract(umbral), ESCALA_INTERNA, RoundingMode.HALF_UP));
+
+		double factorCobertura = Math.min(1.0,
+				chunksUsados.size() / (double) properties.chunksParaCoberturaCompleta());
+
+		return reescalado.multiply(BigDecimal.valueOf(factorCobertura)).setScale(ESCALA, RoundingMode.HALF_UP);
+	}
+
+	private static BigDecimal clampUnitario(BigDecimal valor) {
+		if (valor.compareTo(BigDecimal.ZERO) < 0) {
+			return BigDecimal.ZERO;
+		}
+		if (valor.compareTo(BigDecimal.ONE) > 0) {
+			return BigDecimal.ONE;
+		}
+		return valor;
 	}
 
 	/**

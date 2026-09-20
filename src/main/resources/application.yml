@@ -99,6 +99,18 @@ kimngeam:
       # Cuánto más pesa un chunk validado por un académico frente a uno sin
       # revisar (peso 1) al calcular la confianza de un segmento.
       peso-chunk-validado: ${KIMNGEAM_TRADUCTOR_PESO_CHUNK_VALIDADO:1.5}
+      # Score máximo de similitud coseno que produce bge-m3 sobre este corpus
+      # (medido empíricamente, ver ConfianzaProperties) — contra este techo, no
+      # contra 1.0, se reescala la confianza. Recalibrar si el corpus cambia
+      # sustancialmente.
+      techo-similitud: ${KIMNGEAM_TRADUCTOR_CONFIANZA_TECHO_SIMILITUD:0.72}
+      # Peso del score máximo de los chunks frente al promedio ponderado al
+      # combinar la evidencia de un segmento — 1.0 usaría solo el máximo, 0.0
+      # solo el promedio.
+      peso-maximo: ${KIMNGEAM_TRADUCTOR_CONFIANZA_PESO_MAXIMO:0.5}
+      # Cuántos chunks de respaldo saturan el factor de cobertura en 1.0 —
+      # varias fuentes concordantes son mejor evidencia que una sola.
+      chunks-para-cobertura-completa: ${KIMNGEAM_TRADUCTOR_CONFIANZA_CHUNKS_COBERTURA:3}
     # Límite de solicitudes a POST /traductor/traducir por IP dentro de la
     # ventana — cada llamada cuesta dinero y el endpoint acepta requests
     # anónimas, así que es abusable.
