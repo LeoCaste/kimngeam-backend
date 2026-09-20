@@ -105,6 +105,27 @@ kimngeam:
     rate-limit:
       max-requests: ${KIMNGEAM_TRADUCTOR_RATE_LIMIT_MAX_REQUESTS:10}
       ventana: ${KIMNGEAM_TRADUCTOR_RATE_LIMIT_VENTANA:1m}
+  # Panel de administración (Fase 5).
+  admin:
+    usuarios:
+      # Umbral para derivar estado = "sin-actividad" en GET /admin/usuarios:
+      # usuario activo cuyo ultimo_acceso es nulo o anterior a esto. Nunca se
+      # persiste como columna, se deriva en cada consulta.
+      umbral-sin-actividad: ${KIMNGEAM_ADMIN_UMBRAL_SIN_ACTIVIDAD:30d}
+      # Cuántas validaciones recientes trae GET /admin/usuarios/:id.
+      validaciones-recientes-limite: ${KIMNGEAM_ADMIN_VALIDACIONES_RECIENTES_LIMITE:10}
+    invitaciones:
+      # Vigencia del token de POST /admin/usuarios/invitar.
+      expiracion: ${KIMNGEAM_ADMIN_INVITACIONES_EXPIRACION:7d}
+  # Envío de correo para las invitaciones — mismo mecanismo que embeddings y
+  # LLM. Default "log": NO envía nada de verdad, solo deja constancia en el
+  # log (ver shared/mail/LoggingMailSender) — así un clon nuevo del repo
+  # puede probar el flujo de invitación sin credenciales SMTP. Host/puerto/
+  # usuario/password del SMTP van por las propiedades estándar de Spring Boot
+  # (spring.mail.*, variables SPRING_MAIL_*), no acá.
+  mail:
+    provider: ${KIMNGEAM_MAIL_PROVIDER:log}
+    remitente: ${KIMNGEAM_MAIL_REMITENTE:no-reply@kimngeam.cl}
 
 ---
 spring:
