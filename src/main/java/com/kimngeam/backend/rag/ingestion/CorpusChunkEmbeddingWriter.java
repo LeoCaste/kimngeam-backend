@@ -4,7 +4,6 @@ import com.pgvector.PGvector;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.UUID;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -13,10 +12,12 @@ import org.springframework.stereotype.Component;
  * por JPA: la entidad {@link com.kimngeam.backend.shared.entity.CorpusChunk}
  * no mapea esa columna a propósito (ver su Javadoc). {@code PGvector} viene
  * de {@code com.pgvector:pgvector}, ya en el classpath vía el starter de
- * pgvector de Spring AI.
+ * pgvector de Spring AI. Compartido por la ingesta y por
+ * {@code validaciones.ValidacionCorpusIndexer} — no tiene sentido gatearlo
+ * detrás de {@code kimngeam.corpus.ingestion.enabled} como antes, cuando solo
+ * la ingesta lo usaba.
  */
 @Component
-@ConditionalOnProperty(prefix = "kimngeam.corpus.ingestion", name = "enabled", havingValue = "true")
 public class CorpusChunkEmbeddingWriter {
 
 	private static final String UPDATE_SQL = "UPDATE corpus_chunk SET embedding = ?, modelo_embedding = ? WHERE id = ?";

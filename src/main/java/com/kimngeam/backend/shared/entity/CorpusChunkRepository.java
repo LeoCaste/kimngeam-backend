@@ -1,5 +1,6 @@
 package com.kimngeam.backend.shared.entity;
 
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,4 +15,10 @@ public interface CorpusChunkRepository extends JpaRepository<CorpusChunk, UUID> 
 	 */
 	@Transactional
 	void deleteBySourceType(SourceType sourceType);
+
+	/**
+	 * Ubica el chunk que una validación generó, para poder revertirlo (ver
+	 * {@code validaciones.ValidacionCorpusIndexer#revertir}).
+	 */
+	Optional<CorpusChunk> findBySourceTypeAndSourceRef(SourceType sourceType, String sourceRef);
 }
