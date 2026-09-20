@@ -282,7 +282,11 @@ tuvo respaldo del corpus. Es una decisión de producto: el sistema declara
 explícitamente lo que no sabe en vez de dejarlo pasar con solo una confianza
 baja, y esa señal alimenta la cola de trabajo de los académicos.
 
+`GET /historial` — requiere auth y rol `academico`; devuelve las traducciones
+del usuario autenticado (por `usuario_id`, nunca por nombre — ver CLAUDE.md),
+más recientes primero.
+
 ## Notas pendientes
 
-- `GET /historial` y rate limiting en `/traductor/traducir` quedan para el
-  resto de la Fase 3 (ver docs/TODO.md).
+- Rate limiting en `/traductor/traducir` queda para el resto de la Fase 3
+  (ver docs/TODO.md).

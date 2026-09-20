@@ -45,6 +45,7 @@ public class SecurityConfig {
 						.requestMatchers(HttpMethod.POST, "/auth/login", "/auth/login-admin", "/auth/registro")
 						.permitAll()
 						.requestMatchers(HttpMethod.POST, "/traductor/traducir").permitAll()
+						.requestMatchers(HttpMethod.GET, "/historial").hasRole("ACADEMICO")
 						.requestMatchers("/validaciones/**").hasRole("ACADEMICO")
 						.requestMatchers("/admin/**").hasRole("ADMIN")
 						.anyRequest().authenticated())
