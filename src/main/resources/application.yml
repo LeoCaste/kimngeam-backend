@@ -142,6 +142,11 @@ kimngeam:
   mail:
     provider: ${KIMNGEAM_MAIL_PROVIDER:log}
     remitente: ${KIMNGEAM_MAIL_REMITENTE:no-reply@kimngeam.cl}
+  # Orígenes explícitos permitidos por CORS (ver shared/security/CorsConfig) —
+  # nunca "*", la API maneja tokens JWT. Lista separada por comas. Default: el
+  # puerto por defecto de Vite para el frontend prototipo en desarrollo local.
+  cors:
+    allowed-origins: ${KIMNGEAM_CORS_ALLOWED_ORIGINS:http://localhost:5173}
   auth:
     # Frecuencia del job que purga token_invalidado (ver
     # shared/security/TokenInvalidadoCleanupJob): borra las filas cuyo

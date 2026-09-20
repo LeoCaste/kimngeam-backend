@@ -78,6 +78,7 @@ La app lee configuración sensible desde variables de entorno (ver
 | `KIMNGEAM_MAIL_PROVIDER` | `log` | Envío de invitaciones: `log` (no envía nada real) o `smtp` |
 | `KIMNGEAM_MAIL_REMITENTE` | `no-reply@kimngeam.cl` | Remitente que ve el destinatario de la invitación |
 | `SPRING_MAIL_HOST` / `SPRING_MAIL_PORT` / `SPRING_MAIL_USERNAME` / `SPRING_MAIL_PASSWORD` | *(vacíos)* | SMTP estándar de Spring Boot, solo si `KIMNGEAM_MAIL_PROVIDER=smtp` |
+| `KIMNGEAM_CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | Orígenes explícitos permitidos por CORS, separados por comas — nunca `*` |
 | `KIMNGEAM_TOKEN_INVALIDADO_CLEANUP_INTERVALO` | `1h` | Frecuencia del job que purga filas ya expiradas de `token_invalidado` |
 
 `DB_PASSWORD` no tiene default en `application.yml` a propósito (ningún
@@ -428,6 +429,20 @@ ambiguas y se acordaron explícitamente con el usuario antes de implementar:
 `usuario` es `{nombre, inicial}`, sin `id` — shape distinto del `usuario` de
 `GET /admin/validaciones` (ese sí trae `id`), tal como lo define el contrato
 para cada endpoint.
+
+## CORS (Fase 6)
+
+El frontend (Vue 3 + Vite, otro repo) corre en un origen distinto al de esta
+API. `shared/security/CorsConfig` expone los orígenes permitidos por
+`KIMNGEAM_CORS_ALLOWED_ORIGINS` — una lista explícita separada por comas,
+nunca `"*"`, porque la API maneja tokens JWT en el header `Authorization` y
+un wildcard combinado con credenciales expondría la API a cualquier origen.
+
+**Quien levante el frontend en un origen distinto al default
+(`http://localhost:5173`, el puerto por defecto de Vite) necesita agregar ese
+origen a `KIMNGEAM_CORS_ALLOWED_ORIGINS`** (ej.
+`http://localhost:5173,https://kimngeam-frontend.ufro.cl`), o las llamadas
+del navegador al backend van a fallar por CORS.
 
 ## Limpieza de `token_invalidado` (Fase 6)
 
